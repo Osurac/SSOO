@@ -71,8 +71,11 @@ int main(int argc, char *argv[]) {
 	retCode=listTar(tarName);
     break;
     case ADD:
-	retCode=addFileToTar(nExtra, &argv[optind], tarName, newTarName);
-    break;
+      newTarName = malloc(strlen(tarName) + 6);
+      strncpy(newTarName, tarName, strlen(tarName) - 5);
+      strcat(newTarName, ".new.mtar");
+      retCode=addFileToTar(nExtra, &argv[optind], tarName, newTarName);
+      break;
     default:
       retCode=EXIT_FAILURE;
   }
