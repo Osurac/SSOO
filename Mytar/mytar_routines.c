@@ -14,18 +14,18 @@ extern char *use;
  *
  * Returns the number of bytes actually copied or -1 if an error occured.
  */
-int
-copynFile(FILE * origin, FILE * destination, int nBytes)
-{
+int copynFile(FILE * origin, FILE * destination, int nBytes) {
 	// Complete the function
 
 	int nCopied = 0;
 	int c;
-	//Comprobamos que lo recibido no es null
+
 	if(origin == NULL || destination == NULL) return -1;
 
+	// Copy byte to byte untill EOF is reached or nBytes have been already copied
 	do {
-        	c = getc(origin); 
+
+		c = getc(origin); 
 		if(c != EOF) { 
 			putc(c, destination);
 			nCopied++;
@@ -34,6 +34,7 @@ copynFile(FILE * origin, FILE * destination, int nBytes)
 	} while((c != EOF) && (nCopied != nBytes));
 
 	return nCopied;
+
 }
 
 /** Loads a string from a file.
@@ -47,31 +48,32 @@ copynFile(FILE * origin, FILE * destination, int nBytes)
  * 
  * Returns: !=NULL if success, NULL if error
  */
-char*
-loadstr(FILE * file)
-{
+char* loadstr(FILE * file) {
+	// Complete the function
+
 	char *buffer = NULL;
-	int i;
+	int l;
 	int c;
-	//Controlamos que file no sea null
+
 	if (file == NULL) return NULL;
 
-	// Reservamos memoria en base al tamaño maximo del path, inicializamos i como la variable de recorrido
+	// Allocates the needed memory for the buffer
 	buffer = malloc(PATH_MAX);
-	i = 0;
+	l = 0;
 
-	// Añadimos al buffer la lectura de caracteres del archivo
+	// reads the character from file and add it to the buffer
 	do {
 		c = getc(file);
 		if(c != '\n')
-		buffer[i++] = c;
+			buffer[l++] = c;
 
 	} while(c != '\n');
 
-	// Se añade '\0' al final del string
-	buffer[i] = '\0';
+	// Adds '\0' at the end of the string
+	buffer[l] = '\0';
 
 	return buffer;
+
 }
 
 /** Read tarball header and store it in memory.
@@ -83,25 +85,24 @@ loadstr(FILE * file)
  * On success it returns the starting memory address of an array that stores 
  * the (name,size) pairs read from the tar file. Upon failure, the function returns NULL.
  */
-stHeaderEntry*
-readHeader(FILE * tarFile, int *nFiles)
-{
+stHeaderEntry* readHeader(FILE * tarFile, int *nFiles) {
+	// Complete the function
+
 	stHeaderEntry *arr = NULL;
 
 	int n_files = 0;
 	int i;
 
-	//Controlamos que el tar no sea null
 	if (tarFile == NULL) return NULL;
 
-	// Leemos el numero de ficheros del tar y lo guardamos en n_files
+	// Reads the number of files from the tarFile into n_files
 	fread(&n_files, sizeof(int), 1, tarFile);
 	fscanf(tarFile, "\n");
 
-	// Reservamos memoria para el array
+	// Allocates memory for the array
 	arr = (stHeaderEntry*) malloc(sizeof(stHeaderEntry) * n_files);
 
-	// Leemos la información del tar al array
+	// We read the info from tFile into the array
 	for(i = 0; i < n_files; i++){
 
 		arr[i].name = malloc(PATH_MAX);
@@ -137,9 +138,9 @@ readHeader(FILE * tarFile, int *nFiles)
  * pairs occupy strlen(name)+1 bytes.
  *
  */
-int
-createTar(int nFiles, char *fileNames[], char tarName[])
-{
+int createTar(int nFiles, char *fileNames[], char tarName[]) {
+	// Complete the function
+
 	FILE *iFile = NULL;
 	FILE *tFile = NULL;
 	stHeaderEntry *arr = NULL;
@@ -149,13 +150,13 @@ createTar(int nFiles, char *fileNames[], char tarName[])
 
 	if ((tFile = fopen(tarName, "wb")) == NULL) return EXIT_FAILURE;
 
-	// Reservamos memoria para el array en base al numero de archivos
+	// Allocates the needed memory for the arrat
 	arr = malloc(sizeof(stHeaderEntry) * nFiles);
 
-	// nBytes es el tamaño de la cabecera del tar junto al byte de EOF 
+	// nBytes are the size of the mtar file header + the eof byte (mFiles+1)
 	nBytes = (nFiles + 1) + sizeof(int) + nFiles * sizeof(unsigned int);
 
-	// Copiamos la cabecera en el array
+	// Copies the header of the file into the array
 	for(i = 0; i < nFiles; i++){
 
 		arr[i].name = malloc(strlen(fileNames[i]) + 1);
@@ -164,10 +165,10 @@ createTar(int nFiles, char *fileNames[], char tarName[])
 
 	}
 
-	// Nos movemos los bytes que ocupa la cabecera
+	// Move the file pointer as muhc bytes as the header takes
 	fseek(tFile, nBytes, SEEK_SET);
 
-	// Copiamos el archivo en el mtar
+	// Copies the file info into the nmtar
 	for(i = 0; i < nFiles; i++){
 
 		iFile = fopen(fileNames[i], "rb");
@@ -178,15 +179,15 @@ createTar(int nFiles, char *fileNames[], char tarName[])
 
 	}
 
-	// Nos volvemos con el puntero al byte 0
+	// Places the file pointer to the byte 0
 	rewind(tFile);
 
-	// Escribimos el numero de archivos comprimidos en el mtar
+	// Writes the # of files compressed into the mtar
 	fwrite(&nFiles, sizeof(int), 1, tFile);
 	fwrite("\n", sizeof(char), 1, tFile);
 
-	// Escribimos el nombre y el tamaño de cada archivo y liberamos el espacio.
-	
+	// Writes the filename and it's size for each of the header entries.
+	// Frees the unneeded space
 	for(i = 0; i < nFiles; i++){
 
 		fwrite(arr[i].name, strlen(fileNames[i]), 1, tFile);
@@ -218,9 +219,9 @@ createTar(int nFiles, char *fileNames[], char tarName[])
  * stored in the data section of the tarball.
  *
  */
-int
-extractTar(char tarName[])
-{
+int extractTar(char tarName[]) {
+	// Complete the function
+
 	FILE *oFile = NULL;
 	FILE *tFile = NULL;
 	stHeaderEntry *arr = NULL;
@@ -231,10 +232,10 @@ extractTar(char tarName[])
 
 	if((tFile = fopen(tarName, "rb")) == NULL) return EXIT_FAILURE;
 
-	//Leemos la cabecera del tar y la añadimos al array
+	// Reads the header of the tar file and stores it's info into the arr
 	arr = readHeader(tFile, &n_files);
 
-	// Creamos los ficheros 
+	// creates each of the crompressed files and copies its info into them
 	for(i = 0; i < n_files; i++){
 
 		oFile = fopen(arr[i].name, "wb");
@@ -253,7 +254,7 @@ extractTar(char tarName[])
 /*
 Given the name of a mtar file, shows all the contents (names + size) packed in it.
 Returns 0 if everything went ok.
-*/
+ */
 
 int listTar(char tarName[]){
 
@@ -283,8 +284,8 @@ int listTar(char tarName[]){
 }
 
 /*
-Añade un archivo dado al tar.
-*/
+Adds the given file(s) ot the tarFile.
+ */
 int addFileToTar(int nFiles, char *fileNames[], char tarName[], char newTarName[]){
 
 	FILE *iFile = NULL;
@@ -307,16 +308,16 @@ int addFileToTar(int nFiles, char *fileNames[], char tarName[], char newTarName[
 
 	arr = (stHeaderEntry*) malloc(sizeof(stHeaderEntry)*n_files);
 
-	// Leemos la cabecera del tar y guardamos la información en el array
+	// Reads the header from the tarFile and stores i t's info into the array
 	arr = readHeader(tFile, &n_files);
 
-	// Añadimos el nuevo n de archivos al antiguo
+	// Adds the new file to the current number of files
 	new_n_files = nFiles + n_files;
 
-	// Creamos un nuevo array para guardar toda la info del Tar
+	// creates a new array in order to store all the info in the tarfile
 	newArr = (stHeaderEntry*) malloc(sizeof(stHeaderEntry) * (new_n_files));
 
-	// Copiamos el contenido del array inicial al nuevo
+	// Copies the contents from the original array to the new array
 	for(i = 0; i < n_files; i++){
 
 		newArr[i].name = malloc(strlen(arr[i].name) + 1);
@@ -339,14 +340,14 @@ int addFileToTar(int nFiles, char *fileNames[], char tarName[], char newTarName[
 
 	nBytes += (nFiles + n_files + 1) + sizeof(int) + (new_n_files) * sizeof(unsigned int);
 
-	//Nos movemos con el puntero al header
+	// Moves the file pointer after the header section
 	fseek(newTFile, nBytes, SEEK_SET);
 
-	// Copiamos el antiguo tar en el nuevo
+	// Copies the files from the original tar into the new tar
 	for(i = 0; i < n_files; i++)
 		copynFile(tFile, newTFile, newArr[i].size);
 
-	// Añadimos el nuevo archivo al tar
+	// Adds the new file to the new tar file
 	for(i = 0; i < nFiles; i++){
 
 		iFile = fopen(fileNames[i], "rb");
@@ -357,14 +358,14 @@ int addFileToTar(int nFiles, char *fileNames[], char tarName[], char newTarName[
 
 	}
 
-	//Nos volvemos al byte 0
+	// Places the file pointer to the byte 0 of the tar file
 	rewind(newTFile);
 
-	// Escribimos el numero de archivos comprimidos
+	// Writes the new number of files compresed into the tar
 	fwrite(&new_n_files, sizeof(int), 1, newTFile);
 	fwrite("\n", sizeof(char), 1, newTFile);
 
-	// Escribimos la cabecera
+	// Writes the header data for the file
 	for(i = 0; i < new_n_files; i++){
 
 		fwrite(newArr[i].name, strlen(newArr[i].name), 1, newTFile);
@@ -388,6 +389,7 @@ int addFileToTar(int nFiles, char *fileNames[], char tarName[], char newTarName[
 	return EXIT_SUCCESS;
 
 }
+
 /*Elimina un archivo del tar*/
 int removeFileFromTar(int nFiles, char *fileNames[], char tarName[], char newTarName[]){
 
@@ -398,8 +400,10 @@ int removeFileFromTar(int nFiles, char *fileNames[], char tarName[], char newTar
 
 	int n_files = 0;
 	int new_n_files = 0;
-	int i;
+	int i, j;
 	int nBytes = 0;
+	int fileSize = 0;
+	int filePos;
 
 	if((tFile = fopen(tarName, "rb")) == NULL) return EXIT_FAILURE;
 
@@ -417,31 +421,51 @@ int removeFileFromTar(int nFiles, char *fileNames[], char tarName[], char newTar
 	new_n_files = n_files - nFiles;
 
 	// Creamos un nuevo array para guardar toda la info del Tar
-	newArr = (stHeaderEntry*) malloc(sizeof(stHeaderEntry) * (new_n_files));
+	newArr = (stHeaderEntry*) malloc(sizeof(stHeaderEntry)*new_n_files);
 
 	// Copiamos el contenido del array inicial al nuevo
-	for(i = 0; i < nFiles; i++){
-		if(arr[i].name != fileNames[i]){
-		newArr[i].name = malloc(strlen(arr[i].name) + 1);
-		strcpy(newArr[i].name, arr[i].name);
-		newArr[i].size = arr[i].size;
+	j = 0;
+	for(i = 0; i < n_files; i++){
+		if(strcmp(arr[i].name, fileNames[0])){
+			newArr[j].name = malloc(strlen(arr[i].name) + 1);
+			strcpy(newArr[j].name, arr[i].name);
+			newArr[j].size = arr[i].size;
+			j++;
 		}
-	}	
+		else{
+			fileSize = arr[i].size*sizeof(char);
+			filePos = i;
+		}
+	}
 
-	/*for(i = 0; i < nFiles; i++){
+	for(i = 0; i < new_n_files; i++)
+		nBytes += strlen(newArr[i].name) + 1;
 
-		newArr[i + n_files].name = malloc(strlen(fileNames[i]) + 1);
-		strcpy(newArr[i + n_files].name, fileNames[i]);
-	}*/
+	nBytes += (new_n_files + 1) + sizeof(int) + (new_n_files) * sizeof(unsigned int);
+
+	// Nos movemos los bytes que ocupa la cabecera
+	fseek(newTFile, nBytes, SEEK_SET);
+
+	//
+	rewind(tFile);
+
+	int nBytesOrig = 0;
 
 	for(i = 0; i < n_files; i++)
-		nBytes += strlen(arr[i].name) + 1;
+		nBytesOrig += strlen(arr[i].name) + 1;
 
-	for(i = 0; i < nFiles; i++)
-		nBytes += strlen(fileNames[i]) + 1;
+	nBytesOrig += (n_files + 1) + sizeof(int) + (n_files) * sizeof(unsigned int);
 
-	nBytes += (nFiles + n_files + 1) + sizeof(int) + (new_n_files) * sizeof(unsigned int);
+	fseek(tFile, nBytesOrig, SEEK_SET);
 
+	for(i = 0; i < n_files; i++){
+
+		if(i == filePos)
+			fseek(tFile, fileSize, SEEK_CUR);
+		else
+			copynFile(tFile, newTFile, arr[i].size);
+
+	}
 
 	//Nos volvemos al byte 0
 	rewind(newTFile);
@@ -464,7 +488,7 @@ int removeFileFromTar(int nFiles, char *fileNames[], char tarName[], char newTar
 	for(i = 0; i < n_files; i++)
 		free(arr[i].name);
 
-	printf("Fichero %s, tamano %d Bytes, eliminado con exito.\n", fileNames[0], newArr[new_n_files-1].size);
+	printf("Fichero: %s, tamano: %d Bytes, eliminado con exito.\n", fileNames[0], fileSize);
 
 	free(arr);
 	free(newArr);
