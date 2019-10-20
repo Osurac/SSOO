@@ -476,7 +476,6 @@ static int my_truncate(const char *path, off_t size)
 
 static int my_unlink(const char *path){
 
-	int i;
 	int idxNodoI;
 	int bloqueActual;
 	char bloque[BLOCK_SIZE_BYTES];
@@ -487,7 +486,7 @@ static int my_unlink(const char *path){
  	fprintf(stderr, "--->>>my_unlink: path %s\n", path);
 
 	//Buscamos el nodo i del fichero
-	if(idxNodoI = findFileByName(&myFileSystem, (char *)path+1)) == -1){
+	if((idxNodoI = findFileByName(&myFileSystem, (char*)path+1)) == -1){
 		return -ENOENT;	
 	}
 
@@ -499,16 +498,16 @@ static int my_unlink(const char *path){
 
 		//Borramos la info de los archivos en disco con lseek
 
-		if((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (oof_t) - 1) || (write(myFileSystem.fdVirtualDisk, &bloque, BLOCK_SIZE_BYTES) == -1)){
+		if((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (off_t) - 1) || (write(myFileSystem.fdVirtualDisk, &bloque, BLOCK_SIZE_BYTES) == -1)){
 			perror("Error con lseek en my_unlink"); 
 			return -EIO;
 		}
 
-
+	}
 		updateBitmap(&myFileSystem); //Actualizamos el mapa de bits
-		myFyleSystem.directory.files[idxNodoI].freeFile = 1; //Liberamos la variable del archivo
+		myFileSystem.directory.files[idxNodoI].freeFile = 1; //Liberamos la variable del archivo
 		memset(myFileSystem.directory.files[idxNodoI].fileName, '\0', sizeof(char)*(MAX_LEN_FILE_NAME+1));
-		myFileSistem.directory.numFiles--;
+		myFileSystem.directory.numFiles--;
 
 		updateDirectory(&myFileSystem);
 
@@ -520,7 +519,7 @@ static int my_unlink(const char *path){
 		//En memoria
 
 		free(myFileSystem.nodes[idxNodoI]);
-		myFileSystem.nodes[idxNodeI] = NULL;
+		myFileSystem.nodes[idxNodoI] = NULL;
 
 		myFileSystem.numFreeNodes++;
 
@@ -529,8 +528,6 @@ static int my_unlink(const char *path){
 		updateSuperBlock(&myFileSystem);
 
 		return 0;
-	
-	}
 
 }
 
@@ -539,12 +536,13 @@ static int my_read(const char *path, char *buf, size_t size, off_t offset, struc
 	char buffer[BLOCK_SIZE_BYTES];	
 	int bytesLectura = size;  
 	int totalLeido = 0;
-	NodeStructure *nodo = myFileSystem.nodes[fi->fh];	
+	NodeStruct *nodo = myFileSystem.nodes[fi->fh];	
 
 	fprintf(stderr, "--->>>my_read: path %s, size %zu, offset %jd, fh %"PRIu64"\n", path, size, (intmax_t)offset, fi->fh);//PRIu64 para imprimir enteros sin signo de 64 bytes
 
 	while(bytesLectura) {	
-
+		
+		int i;
 		int bloqueActual;
 		int offsetBloque;
 		bloqueActual = nodo->blocks[offset / BLOCK_SIZE_BYTES];
@@ -558,7 +556,7 @@ static int my_read(const char *path, char *buf, size_t size, off_t offset, struc
 
 		}
 
-		for( int i=offsetBloque; (i<BLOCK_SIZE_BYTES) && (totalLeido<size); i++){
+		for(i = offsetBloque; (i<BLOCK_SIZE_BYTES) && (totalLeido<size); i++){
 
 			buf[totalLeido++]=buffer[i];
 
