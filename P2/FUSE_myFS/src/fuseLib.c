@@ -534,8 +534,57 @@ static int my_unlink(const char *path){
 
 }
 
-static int function my_read(){
+static int my_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
 
+	char buffer[BLOCK_SIZE_BYTES];	
+	int bytesLectura = size;  
+	int totalLeido = 0;
+	NodeStructure *nodo = myFileSystem.nodes[fi->fh];	
+
+	fprintf(stderr, "--->>>my_read: path %s, size %zu, offset %jd, fh %"PRIu64"\n", path, size, (intmax_t)offset, fi->fh);//PRIu64 para imprimir enteros sin signo de 64 bytes
+
+	while(bytesLectura) {	
+
+		int bloqueActual;
+		int offsetBloque;
+		bloqueActual = nodo->blocks[offset / BLOCK_SIZE_BYTES];
+
+		offsetBloque = offset % BLOCK_SIZE_BYTES;
+
+		if ((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (off_t) - 1) || (read(myFileSystem.fdVirtualDisk, &buffer, BLOCK_SIZE_BYTES) == -1)){
+			
+			perror("Error con lseek en my_read");
+			return -EIO;
+
+		}
+
+		for( int i=offsetBloque; (i<BLOCK_SIZE_BYTES) && (totalLeido<size); i++){
+
+			buf[totalLeido++]=buffer[i];
+
+		}
+		
+	    	if((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (off_t) - 1) || (read(myFileSystem.fdVirtualDisk, &buffer, BLOCK_SIZE_BYTES) == -1)){
+			
+			perror("Error con lseek en my_read"); 
+			return -EIO;
+
+		}
+		
+		bytesLectura = bytesLectura - (i - offsetBloque);
+		offset = offset + i;
+
+	}
+
+	nodo->modificationTime = time(NULL);
+	
+	updateSuperBlock(&myFileSystem);
+	updateBitmap(&myFileSystem);
+	updateNode(&myFileSystem, fi->fh, nodo);
+
+	sync();
+
+	return size;
 }
 
 
