@@ -474,6 +474,70 @@ static int my_truncate(const char *path, off_t size)
     return 0;
 }
 
+static int my_unlink(const char *path){
+
+	int i;
+	int idxNodoI;
+	int bloqueActual;
+	char bloque[BLOCK_SIZE_BYTES];
+
+	//inicializamos el bloque a 0
+
+	memset(bloque, 0, sizeof(char)*BLOCK_SIZE_BYTES);
+ 	fprintf(stderr, "--->>>my_unlink: path %s\n", path);
+
+	//Buscamos el nodo i del fichero
+	if(idxNodoI = findFileByName(&myFileSystem, (char *)path+1)) == -1){
+		return -ENOENT;	
+	}
+
+	//Liberamos los boques del fichero con el mapa de bits
+	for(int i = 0; i < myFileSystem.nodes[idxNodoI]->numBlocks; i++){
+
+		bloqueActual = myFileSystem.nodes[idxNodoI]->blocks[i];
+		myFileSystem.bitMap[bloqueActual] = 0;
+
+		//Borramos la info de los archivos en disco con lseek
+
+		if((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (oof_t) - 1) || (write(myFileSystem.fdVirtualDisk, &bloque, BLOCK_SIZE_BYTES) == -1)){
+			perror("Error con lseek en my_unlink"); 
+			return -EIO;
+		}
+
+
+		updateBitmap(&myFileSystem); //Actualizamos el mapa de bits
+		myFyleSystem.directory.files[idxNodoI].freeFile = 1; //Liberamos la variable del archivo
+		memset(myFileSystem.directory.files[idxNodoI].fileName, '\0', sizeof(char)*(MAX_LEN_FILE_NAME+1));
+		myFileSistem.directory.numFiles--;
+
+		updateDirectory(&myFileSystem);
+
+		//Tratamos los Nodos I
+
+		myFileSystem.nodes[idxNodoI]->freeNode = 1;
+		updateNode(&myFileSystem, idxNodoI, myFileSystem.nodes[idxNodoI]);
+
+		//En memoria
+
+		free(myFileSystem.nodes[idxNodoI]);
+		myFileSystem.nodes[idxNodeI] = NULL;
+
+		myFileSystem.numFreeNodes++;
+
+		myFileSystem.superBlock.numOfFreeBlocks = myQuota(&myFileSystem);
+
+		updateSuperBlock(&myFileSystem);
+
+		return 0;
+	
+	}
+
+}
+
+static int function my_read(){
+
+}
+
 
 struct fuse_operations myFS_operations = {
     .getattr	= my_getattr,					// Obtain attributes from a file
@@ -481,7 +545,8 @@ struct fuse_operations myFS_operations = {
     .truncate	= my_truncate,					// Modify the size of a file
     .open		= my_open,						// Oeen a file
     .write		= my_write,						// Write data into a file already opened
+    .read 		= my_read,						// Leer un fichero abierto
     .release	= my_release,					// Close an opened file
     .mknod		= my_mknod,						// Create a new file
+    .unlink         = my_unlink,						// Borrar un fichero
 };
-
