@@ -597,3 +597,4 @@ struct fuse_operations myFS_operations = {
     .mknod		= my_mknod,						// Create a new file
     .unlink         = my_unlink,						// Borrar un fichero
 };
+
