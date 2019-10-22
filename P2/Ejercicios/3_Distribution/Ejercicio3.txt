@@ -1,0 +1,33 @@
+usuarioso@ssoo:~/Escritorio/P2/Ejercicios/3_Distribution$ ./distribution -t $HOME
+Results for the directory /home/usuarioso.
+Range		Total	Percentage
+[0K, 10K]	4055	59.641124%
+[10K, 20K]	1238	18.208560%
+[20K, 30K]	296	4.353581%
+[30K, 40K]	195	2.868069%
+[40K, 50K]	150	2.206207%
+[50K, 60K]	118	1.735549%
+[60K, 70K]	71	1.044271%
+[70K, 80K]	56	0.823651%
+[80K, 90K]	50	0.735402%
+[90K, 100K]	54	0.794234%
+Greater		516	7.589351%
+=======		=====	=======
+TOTAL FILES	6799	100.000000%
+
+usuarioso@ssoo:~/Escritorio/P2/Ejercicios/3_Distribution$ ./distribution -n $HOME
+Results for the directory /home/usuarioso.
+Range		Total	Percentage
+[ 0,  10]	1284	93.178520%
+[10,  20]	50	3.628447%
+[20,  30]	14	1.015965%
+[30,  40]	11	0.798258%
+[40,  50]	4	0.290276%
+[50,  60]	1	0.072569%
+[60,  70]	2	0.145138%
+[70,  80]	3	0.217707%
+[80,  90]	1	0.072569%
+[90, 100]	1	0.072569%
+More than 100	7	0.507983%
+=======		=====	=======
+TOTAL DIRECT.	1378	100.000000%

@@ -8,7 +8,7 @@
 
 char permissions[] = {'x', 'w', 'r'};
 
-int status(char *);
+int status(char *, char *);
 
 int main(int argc, char *argv[]) {
 	int i;
@@ -19,20 +19,34 @@ int main(int argc, char *argv[]) {
 
 	// Show the status of each file
 	for (i=1; i<argc; i++)
-		status(argv[i]);
-
+		if((strcmp(argv[i], "-L") == 0)){
+			status(argv[i+1], "-L");
+			i++;
+		}else{
+		status(argv[i], "");
+	}
 	exit(0);
 }
 
-int status(char *filename) {
+int status(char *filename, char *param) {
 	struct stat buf;
 	struct passwd *pw;
 	struct group *gr;
 	int i;
 
 	// Fills buf with the stat structure containing file attributes
-	if (stat(filename, &buf) == -1)
-		perror(filename), exit(-1);
+	if((strcmp(param, "-L") == 0)) {
+		
+		  if (lstat(filename, &buf) == -1)
+		  perror(filename), exit(-1);
+
+	}else{
+
+		  if (stat(filename, &buf) == -1)
+		  perror(filename), exit(-1);
+
+	}
+	
 	printf("File: %s\n", filename);
 
 	// The st_dev field describes the device on which this file resides. 

@@ -1,0 +1,24 @@
+usuarioso@ssoo:~/Escritorio/P2/Ejercicios/1_Copy$ time ./copy Quijote_1.pdf Quijote_1024.pdf 1024
+Starting COPY
+Ends of COPY
+
+real	0m0,043s
+user	0m0,006s
+sys	0m0,015s
+
+usuarioso@ssoo:~/Escritorio/P2/Ejercicios/1_Copy$ time ./copy Quijote_1.pdf Quijote_512.pdf 512
+Starting COPY
+Ends of COPY
+
+real	0m0,068s
+user	0m0,000s
+sys	0m0,039s
+
+usuarioso@ssoo:~/Escritorio/P2/Ejercicios/1_Copy$ time ./copy Quijote_1.pdf Quijote_256.pdf 256
+Starting COPY
+Ends of COPY
+
+real	0m0,101s
+user	0m0,007s
+sys	0m0,064s
+
