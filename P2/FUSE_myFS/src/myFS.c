@@ -298,27 +298,75 @@ int updateSuperBlock(MyFileSystem *myFileSystem)
 
 /* Code for the optional part of the lab assignment */
 
-int readBitmap(MyFileSystem *myFileSystem)
-{
-    return -1;
+int readBitmap(MyFileSystem *myFileSystem) {
+    
+    if (lseek(myFileSystem->fdVirtualDisk, BLOCK_SIZE_BYTES * BITMAP_IDX, SEEK_SET) == (off_t) - 1){
+        perror("Failed lseek in readBitMap");
+        return -1;
+    }
+
+    if (read(myFileSystem->fdVirtualDisk, myFileSystem->bitMap, sizeof (BIT) * NUM_BITS) == -1){
+        perror("Failed read in readBitMap");
+        return -1;
+    }
+
+    return 0;
+
 }
 
 
+int readDirectory(MyFileSystem* myFileSystem) {
+    
+    if (lseek(myFileSystem->fdVirtualDisk, BLOCK_SIZE_BYTES * DIRECTORY_IDX, SEEK_SET) == (off_t) - 1){
+        perror("Failed lseek in readDirectory");
+        return -1;
+    }
 
-int readDirectory(MyFileSystem* myFileSystem)
-{
-    return -1;
+    if (read(myFileSystem->fdVirtualDisk, &(myFileSystem->directory), sizeof(DirectoryStruct)) == -1){
+        perror("Failed read in readDirectory");
+        return -1;
+    }
+
+    return 0;
+
 }
 
 
-int readSuperblock(MyFileSystem* myFileSystem)
-{
-    return -1;
+int readSuperblock(MyFileSystem* myFileSystem) {
+    if (lseek(myFileSystem->fdVirtualDisk, BLOCK_SIZE_BYTES * SUPERBLOCK_IDX, SEEK_SET) == (off_t) - 1){
+        perror("Failed lseek in readSuperblock");
+        return -1;
+    }
+
+    if (read(myFileSystem->fdVirtualDisk, &(myFileSystem->superBlock), sizeof (SuperBlockStruct)) == -1){
+        perror("Failed read in readSuperblock");
+        return -1;
+    }
+
+    return 0;
+
 }
 
-int readInodes(MyFileSystem* myFileSystem)
-{
-    return -1;
+int readInodes(MyFileSystem* myFileSystem) {
+    
+    int numNodeI;
+    NodeStruct* tmp = malloc(sizeof (NodeStruct));
+
+    for (numNodeI = 0; numNodeI < MAX_NODES; numNodeI++){
+
+        readNode(myFileSystem, numNodeI, tmp);
+        if(tmp->freeNode)
+            myFileSystem->nodes[numNodeI] = NULL;
+        else {
+            myFileSystem->numFreeNodes--;
+            myFileSystem->nodes[numNodeI] = malloc(sizeof (NodeStruct));
+            copyNode(myFileSystem->nodes[numNodeI], tmp);
+        }
+
+    }
+
+    return 0;
+
 }
 
 int myMount(MyFileSystem *myFileSystem, char *backupFileName)

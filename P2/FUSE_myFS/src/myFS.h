@@ -25,6 +25,8 @@
 #define DIRECTORY_IDX 2
 #define NODES_IDX 3
 
+#define MAX_PATH_LINK 60
+
 // STRUCTS
 typedef struct FileStructure {
     int  nodeIdx;                         	// Associated i-node
@@ -43,6 +45,8 @@ typedef struct NodeStructure {
     time_t modificationTime;              		// Modification time
     DISK_LBA blocks[MAX_BLOCKS_PER_FILE];		// Blocks
     BOOLEAN freeNode;                        	// If the node is available
+    int type;                                   // 1 - symlink | 2 - directory
+    char linkDestiny[MAX_PATH_LINK + 1];        // Path to the link 
 } NodeStruct;
 
 #define NODES_PER_BLOCK (BLOCK_SIZE_BYTES/sizeof(NodeStruct))

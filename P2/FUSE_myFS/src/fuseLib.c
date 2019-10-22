@@ -182,7 +182,10 @@ static int my_getattr(const char *path, struct stat *stbuf)
     if((idxDir = findFileByName(&myFileSystem, (char *)path + 1)) != -1) {
         node = myFileSystem.nodes[myFileSystem.directory.files[idxDir].nodeIdx];
         stbuf->st_size = node->fileSize;
-        stbuf->st_mode = S_IFREG | 0644;
+        if(node->type == 1)
+	        stbuf->st_mode = S_IFLNK | 0644;
+	    else
+	    	stbuf->st_mode = S_IFREG | 0644;
         stbuf->st_nlink = 1;
         stbuf->st_uid = getuid();
         stbuf->st_gid = getgid();
@@ -474,127 +477,181 @@ static int my_truncate(const char *path, off_t size)
     return 0;
 }
 
-static int my_unlink(const char *path){
+static int my_unlink(const char *path) {
 
-	int idxNodoI;
-	int bloqueActual;
-	char bloque[BLOCK_SIZE_BYTES];
+	fprintf(stderr, "--->>>my_unlink: path %s\n", path);
 
-	//inicializamos el bloque a 0
+    // Checks if the name of the file is valid
+    if(strlen(path + 1) > myFileSystem.superBlock.maxLenFileName) return -ENAMETOOLONG;
+    
+    int idxDir = findFileByName(&myFileSystem, (char *) path + 1);
 
-	memset(bloque, 0, sizeof(char)*BLOCK_SIZE_BYTES);
- 	fprintf(stderr, "--->>>my_unlink: path %s\n", path);
+    // Check file exists
+    if(idxDir == -1) return -EEXIST;
 
-	//Buscamos el nodo i del fichero
-	if((idxNodoI = findFileByName(&myFileSystem, (char*)path+1)) == -1){
-		return -ENOENT;	
-	}
+    // Modify size of file to 0
+    if(resizeNode(myFileSystem.directory.files[idxDir].nodeIdx,0) < 0) return -EIO;
+    
+    // Update inode 
+    myFileSystem.nodes[myFileSystem.directory.files[idxDir].nodeIdx]->freeNode = true;
+    updateNode(&myFileSystem, myFileSystem.directory.files[idxDir].nodeIdx, myFileSystem.nodes[myFileSystem.directory.files[idxDir].nodeIdx]);
+    
+    // Free inode
+    free(myFileSystem.nodes[myFileSystem.directory.files[idxDir].nodeIdx]);
+    myFileSystem.nodes[myFileSystem.directory.files[idxDir].nodeIdx] = NULL;
+    
+    // Update root folder
+    myFileSystem.directory.files[idxDir].freeFile = true;
+    myFileSystem.directory.numFiles--;
+    updateDirectory(&myFileSystem);
+    myFileSystem.numFreeNodes++;
 
-	//Liberamos los boques del fichero con el mapa de bits
-	for(int i = 0; i < myFileSystem.nodes[idxNodoI]->numBlocks; i++){
-
-		bloqueActual = myFileSystem.nodes[idxNodoI]->blocks[i];
-		myFileSystem.bitMap[bloqueActual] = 0;
-
-		//Borramos la info de los archivos en disco con lseek
-
-		if((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (off_t) - 1) || (write(myFileSystem.fdVirtualDisk, &bloque, BLOCK_SIZE_BYTES) == -1)){
-			perror("Error con lseek en my_unlink"); 
-			return -EIO;
-		}
-
-	}
-		updateBitmap(&myFileSystem); //Actualizamos el mapa de bits
-		myFileSystem.directory.files[idxNodoI].freeFile = 1; //Liberamos la variable del archivo
-		memset(myFileSystem.directory.files[idxNodoI].fileName, '\0', sizeof(char)*(MAX_LEN_FILE_NAME+1));
-		myFileSystem.directory.numFiles--;
-
-		updateDirectory(&myFileSystem);
-
-		//Tratamos los Nodos I
-
-		myFileSystem.nodes[idxNodoI]->freeNode = 1;
-		updateNode(&myFileSystem, idxNodoI, myFileSystem.nodes[idxNodoI]);
-
-		//En memoria
-
-		free(myFileSystem.nodes[idxNodoI]);
-		myFileSystem.nodes[idxNodoI] = NULL;
-
-		myFileSystem.numFreeNodes++;
-
-		myFileSystem.superBlock.numOfFreeBlocks = myQuota(&myFileSystem);
-
-		updateSuperBlock(&myFileSystem);
-
-		return 0;
+    sync();
+    
+    return 0;
 
 }
 
-static int my_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-
-	char buffer[BLOCK_SIZE_BYTES];	
-	int bytesLectura = size;  
-	int totalLeido = 0;
-	NodeStruct *nodo = myFileSystem.nodes[fi->fh];	
-
-	fprintf(stderr, "--->>>my_read: path %s, size %zu, offset %jd, fh %"PRIu64"\n", path, size, (intmax_t)offset, fi->fh);//PRIu64 para imprimir enteros sin signo de 64 bytes
-
-	while(bytesLectura) {	
-		
-		int i;
-		int bloqueActual;
-		int offsetBloque;
-		bloqueActual = nodo->blocks[offset / BLOCK_SIZE_BYTES];
-
-		offsetBloque = offset % BLOCK_SIZE_BYTES;
-
-		if ((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (off_t) - 1) || (read(myFileSystem.fdVirtualDisk, &buffer, BLOCK_SIZE_BYTES) == -1)){
-			
-			perror("Error con lseek en my_read");
-			return -EIO;
-
-		}
-
-		for(i = offsetBloque; (i<BLOCK_SIZE_BYTES) && (totalLeido<size); i++){
-
-			buf[totalLeido++]=buffer[i];
-
-		}
-		
-	    	if((lseek(myFileSystem.fdVirtualDisk, bloqueActual*BLOCK_SIZE_BYTES, SEEK_SET) == (off_t) - 1) || (read(myFileSystem.fdVirtualDisk, &buffer, BLOCK_SIZE_BYTES) == -1)){
-			
-			perror("Error con lseek en my_read"); 
-			return -EIO;
-
-		}
-		
-		bytesLectura = bytesLectura - (i - offsetBloque);
-		offset = offset + i;
-
-	}
-
-	nodo->modificationTime = time(NULL);
+static int my_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *f){
 	
-	updateSuperBlock(&myFileSystem);
-	updateBitmap(&myFileSystem);
-	updateNode(&myFileSystem, fi->fh, nodo);
+	char buffer[BLOCK_SIZE_BYTES];
+	int bytes2Read = size;
+	NodeStruct *node = myFileSystem.nodes[f->fh];
+	int bytesenfichero = node->fileSize;
+	int pos = 0;
+    int i = 0;
+	int idxDir = findFileByName(&myFileSystem, (char *) path + 1);
 
+	if(idxDir == -1) return -EEXIST;
+
+	fprintf(stderr, "--->>>my_read: path %s, size %zu, offset %jd, fh %"PRIu64"\n", path, size, (intmax_t)offset, f->fh);
+			
+	while((bytes2Read > 0) && (bytesenfichero > 0)){
+	
+		int offbloque, bloqueactual;
+		bloqueactual = node->blocks[offset / BLOCK_SIZE_BYTES];
+		offbloque = offset % BLOCK_SIZE_BYTES;
+		int leido = 0;
+		
+		if((lseek(myFileSystem.fdVirtualDisk, (bloqueactual * BLOCK_SIZE_BYTES)+offbloque, SEEK_SET)) == (off_t) - 1){
+			perror("Failed lseek/read in my_read");
+			return -EIO;
+		}
+
+		leido = read(myFileSystem.fdVirtualDisk,&buffer, (BLOCK_SIZE_BYTES-offbloque));
+		if(leido == -1){
+			perror("Failed lseek/readblock in my_read");
+			return -EIO;
+		}
+
+		for(i = 0; i < leido; i++){
+			buf[pos] = buffer[i];
+			pos++;
+		}
+
+		bytes2Read -= leido;
+		bytesenfichero -= leido;
+		offset += leido;
+		
+	}
+	
+	node->modificationTime = time(NULL);
 	sync();
-
+	
+	if((bytesenfichero <= 0) && (bytes2Read > 0)){
+		for(i = (size - bytes2Read); i < size; i++) buf[i] = '\0';
+		return (size-bytes2Read);	
+	}	
+	
 	return size;
 }
 
+int my_symlink(const char *existingpath, const char *newpath){
+
+	fprintf(stderr, "--->>>my_symlink: existingpath: %s, newpath: %s\n", existingpath, newpath);
+
+	// Checks if the lenght of the file is valid
+	if (strlen(newpath + 1) > myFileSystem.superBlock.maxLenFileName) return -ENAMETOOLONG;
+
+	// Checks if there's a free i-node
+	if (myFileSystem.numFreeNodes <= 0) return -ENOSPC;
+
+	// Checks if there's room for another file in the directory
+	if (myFileSystem.directory.numFiles >= MAX_FILES_PER_DIRECTORY) return -ENOSPC;
+
+	// Checks that the file isn't already in the directory
+	if (findFileByName(&myFileSystem, (char*)newpath + 1) != -1) return -EEXIST;
+
+	// Searchs for a free node
+	int idxNodoI;
+	if ((idxNodoI = findFreeNode(&myFileSystem)) == -1) return -ENOSPC;
+
+	// Updates the root directory
+	myFileSystem.directory.files[idxNodoI].freeFile = false;
+	myFileSystem.directory.numFiles++;
+	strcpy(myFileSystem.directory.files[idxNodoI].fileName, newpath + 1);
+	myFileSystem.directory.files[idxNodoI].nodeIdx = idxNodoI;
+	myFileSystem.numFreeNodes--;
+
+	// Fills the new i-node info
+	if (myFileSystem.nodes[idxNodoI] == NULL)
+		myFileSystem.nodes[idxNodoI] = malloc(sizeof(NodeStruct));
+
+	myFileSystem.nodes[idxNodoI]->type = 1;
+	myFileSystem.nodes[idxNodoI]->fileSize = strlen(existingpath);
+	myFileSystem.nodes[idxNodoI]->numBlocks = 0;
+	myFileSystem.nodes[idxNodoI]->modificationTime = time(NULL);
+	myFileSystem.nodes[idxNodoI]->freeNode = false;
+	strcpy(myFileSystem.nodes[idxNodoI]->linkDestiny, existingpath);
+
+	// Save the modified structures
+	updateDirectory(&myFileSystem);
+	updateNode(&myFileSystem, idxNodoI, myFileSystem.nodes[idxNodoI]);
+	sync();
+
+	return 0;
+
+}
+
+int my_readlink(const char *path, char *buf, size_t bufsize){
+
+	int dir_idx;
+	FileStruct* directoryEntry = NULL;
+	NodeStruct* node = NULL;
+	char* name = (char*) path + 1;
+	int idxNodoI;
+
+	// Searchs for the directory
+	dir_idx = findFileByName(&myFileSystem, name);
+	if (dir_idx == -1) return -ENOENT;
+
+	directoryEntry = &myFileSystem.directory.files[dir_idx];
+	idxNodoI = directoryEntry->nodeIdx;
+	node = myFileSystem.nodes[idxNodoI];
+
+	if (node->type != 1) return -EINVAL;
+
+	// Reads the node path
+	if (bufsize < strlen(node->linkDestiny)) strcpy(buf, node->linkDestiny);
+	else{
+		strncpy(buf, node->linkDestiny, bufsize - 1);
+		buf[bufsize - 1] = '\0';
+	}
+
+	return 0;
+
+}
 
 struct fuse_operations myFS_operations = {
-    .getattr	= my_getattr,					// Obtain attributes from a file
-    .readdir	= my_readdir,					// Read directory entries
-    .truncate	= my_truncate,					// Modify the size of a file
-    .open		= my_open,						// Oeen a file
-    .write		= my_write,						// Write data into a file already opened
-    .read 		= my_read,						// Leer un fichero abierto
-    .release	= my_release,					// Close an opened file
-    .mknod		= my_mknod,						// Create a new file
-    .unlink         = my_unlink,						// Borrar un fichero
+    .getattr 	= my_getattr,		// Obtain attributes from a file
+    .readdir 	= my_readdir,		// Read directory entries
+    .truncate 	= my_truncate,		// Modify the size of a file
+    .open 		= my_open,			// Open a file
+    .write 		= my_write,			// Write data into a file already opened
+    .release 	= my_release,		// Close an opened file
+    .mknod 		= my_mknod,			// Create a new file
+	.unlink 	= my_unlink,		// Deletes an existing file
+	.read 		= my_read,			// Reads data from a file
+	.symlink	= my_symlink, 		// Creates a symbolic link
+	.readlink 	= my_readlink,		// Reads a link
 };
-
